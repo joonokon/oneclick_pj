@@ -1,16 +1,65 @@
 // ==UserScript==
 // @name         评教一键选择按钮
 // @namespace    https://github.com/joonokon
-// @version      1.0.0
+// @version      1.1.0
 // @description  为评教页面添加一键选择按钮
 // @author       joonokon
-// @match        https://pj.*.edu.cn/*
+// @match        https://pj.bit.edu.cn/*
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
 
 (function() {
     'use strict';
+
+    // 自动查找并点击提交按钮，并自动确认弹窗
+    function autoSubmit(doc) {
+        // 优先查找a.btn-warning[onclick*='savePjxx']
+        var submitBtn = doc.querySelector('a.btn-warning[onclick*="savePjxx"]');
+        // 其次查找常见提交按钮类型和自定义class
+        if (!submitBtn) {
+            submitBtn = doc.querySelector('button[type="submit"], input[type="submit"], .btn-primary, .btn-success, .submit, [onclick*="submit"], [id*="submit"], .btn-warning[onclick*="savePjxx"]');
+        }
+        // 兼容部分评教系统用的“提交”文字按钮
+        if (!submitBtn) {
+            submitBtn = Array.from(doc.querySelectorAll('button,input,a')).find(e => /提交/.test(e.value || e.textContent));
+        }
+        var submitted = false;
+        if (submitBtn) {
+            // 优先直接触发onclick
+            if (typeof submitBtn.onclick === 'function') {
+                submitBtn.onclick();
+                submitted = true;
+            } else {
+                // 若是a标签且有onclick属性，尝试用eval执行
+                var onclickAttr = submitBtn.getAttribute('onclick');
+                if (onclickAttr) {
+                    try {
+                        eval(onclickAttr);
+                        submitted = true;
+                    } catch (e) {}
+                } else {
+                    submitBtn.click();
+                    submitted = true;
+                }
+            }
+        }
+        // 无论是否找到按钮，始终尝试直接调用window.savePjxx('1')
+        if (typeof window.savePjxx === 'function') {
+            window.savePjxx('1');
+            submitted = true;
+        }
+        if (submitted) {
+            setTimeout(function() {
+                var okBtn = doc.querySelector('.bootbox .btn-primary, .modal-footer .btn-primary, .btn[onclick*="ok"], .btn[onclick*="confirm"], .btn-primary');
+                if (!okBtn) {
+                    okBtn = Array.from(doc.querySelectorAll('button,input,a')).find(e => /确定|确认|OK|Yes/i.test(e.value || e.textContent));
+                }
+                if (okBtn) okBtn.click();
+            }, 300);
+        }
+    }
+
     // 判断当前脚本是否运行在iframe中
     function inIframe () {
         try { return window.self !== window.top; } catch (e) { return true; }
@@ -23,9 +72,9 @@
     function addButtons(doc) {
         // 先找h4.lighter作为插入点
         var h4 = doc.querySelector('h4.lighter');
-        // 若找不到，找包含“课程评价”的h4或label
+        // 若找不到，找包含“课程评价”的h4、label、div、span等
         if (!h4) {
-            h4 = Array.from(doc.querySelectorAll('h4,label')).find(e => e.textContent && e.textContent.indexOf('课程评价') !== -1);
+            h4 = Array.from(doc.querySelectorAll('h4,label,div,span')).find(e => e.textContent && e.textContent.indexOf('课程评价') !== -1);
         }
         // 未找到插入点则返回
         if (!h4) return;
@@ -37,11 +86,11 @@
         btnBar.style.margin = '15px 0';
         // 定义5个按钮及其样式
         var btns = [
-            {text: '一键非常符合', idx: 1, color: '#5cb85c'},
-            {text: '一键比较符合', idx: 2, color: '#0275d8'},
-            {text: '一键一般', idx: 3, color: '#5bc0de'},
-            {text: '一键比较不符合', idx: 4, color: '#f0ad4e'},
-            {text: '一键非常不符合', idx: 5, color: '#d9534f'}
+            {text: '非常符合', idx: 1, color: '#5cb85c'},
+            {text: '比较符合', idx: 2, color: '#0275d8'},
+            {text: '一般', idx: 3, color: '#5bc0de'},
+            {text: '比较不符合', idx: 4, color: '#f0ad4e'},
+            {text: '非常不符合', idx: 5, color: '#d9534f'}
         ];
         // 生成按钮并绑定点击事件
         btns.forEach(function(btn) {
@@ -59,6 +108,32 @@
             b.onclick = function() { selectAllOption(doc, btn.idx); };
             btnBar.appendChild(b);
         });
+        // 添加“提交并返回”按钮
+        var submitBackBtn = doc.createElement('button');
+        submitBackBtn.type = 'button';
+        submitBackBtn.textContent = '提交并返回';
+        submitBackBtn.style.background = '#e67e22'; // 深橙色
+        submitBackBtn.style.color = '#fff';
+        submitBackBtn.style.border = 'none';
+        submitBackBtn.style.padding = '8px 22px';
+        submitBackBtn.style.borderRadius = '4px';
+        submitBackBtn.style.cursor = 'pointer';
+        submitBackBtn.style.fontWeight = 'bold';
+        submitBackBtn.style.fontSize = '16px';
+        submitBackBtn.style.boxShadow = '0 2px 8px rgba(230,126,34,0.15)';
+        submitBackBtn.style.marginLeft = '32px'; // 与左侧按钮拉开距离
+        submitBackBtn.style.float = 'right';
+        submitBackBtn.onmouseover = function(){submitBackBtn.style.background='#d35400';};
+        submitBackBtn.onmouseout = function(){submitBackBtn.style.background='#e67e22';};
+        submitBackBtn.onclick = function() {
+            autoSubmit(doc);
+            setTimeout(function() {
+                if (typeof window.queryBackSy === 'function') {
+                    window.queryBackSy();
+                }
+            }, 800);
+        };
+        btnBar.appendChild(submitBackBtn);
         // 插入到标题后面
         h4.parentNode.insertBefore(btnBar, h4.nextSibling);
     }
