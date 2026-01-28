@@ -31,21 +31,11 @@
                 submitBtn.onclick();
                 submitted = true;
             } else {
-                // 若是a标签且有onclick属性，尝试用eval执行
-                var onclickAttr = submitBtn.getAttribute('onclick');
-                if (onclickAttr) {
-                    try {
-                        eval(onclickAttr);
-                        submitted = true;
-                    } catch (e) {}
-                } else {
-                    submitBtn.click();
-                    submitted = true;
-                }
+                submitBtn.click();
+                submitted = true;
             }
-        }
-        // 无论是否找到按钮，始终尝试直接调用window.savePjxx('1')
-        if (typeof window.savePjxx === 'function') {
+        } else if (typeof window.savePjxx === 'function') {
+            // 只有找不到按钮时才直接调用 savePjxx
             window.savePjxx('1');
             submitted = true;
         }
